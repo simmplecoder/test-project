@@ -5,38 +5,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17)
 
 option(use_conan "Use Conan to install dependencies")
-# option(blas_lib_name "BLAS library to use as backend for Blaze. Only Intel MKL is supported for now. The specified library must be the one Blaze is configured for" "MKL")
-set(blas_lib_name "MKL" CACHE STRING "BLAS library to use as backend for Blaze. Only Intel MKL is supported for now. The specified library must be the one Blaze is configured for.")
 
-### setup dependencies for blazing-gil
-
-add_library(blas_library INTERFACE)
-
-message(STATUS "Selected BLAS library: ${blas_lib_name}")
-
-if (blas_lib_name STREQUAL "MKL")
-    if (DEFINED MKLROOT)
-        set(ENV{MKLROOT} ${MKLROOT})
-    elseif(NOT DEFINED ENV{MKLROOT})
-        message(FATAL_ERROR "Please either pass MKLROOT variable or set environment variable MKLROOT")
-    endif()
-    find_package(BLAS REQUIRED)
-    target_link_libraries(blas_library INTERFACE ${BLAS_LIBRARIES})
-    target_include_directories(blas_library INTERFACE $ENV{MKLROOT}/include)
-else()
-    message(FATAL_ERROR "Please select one of the supported BLAS libraries (only MKL is supported for now)")
-endif()
-
-### blaze
-find_package(blaze REQUIRED)
-
-### GIL dependencies - jpeg, png, tiff, tiffxx, Boost::filesystem, Boost::headers (headers)
-add_library(GIL INTERFACE)
-
-find_package(Boost
-        COMPONENTS
-        filesystem
-        REQUIRED)
 if (USE_CONAN)
   # Download automatically, you can also just copy the conan.cmake file
   if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
@@ -56,53 +25,14 @@ if (USE_CONAN)
 
   set(CMAKE_BUILD_TYPE ${_build_type_saved})
   unset(_build_type_saved)
-
-  target_link_libraries(GIL
-    INTERFACE
-      CONAN_PKG::libjpeg
-      CONAN_PKG::libpng
-      CONAN_PKG::libtiff
-      Boost::headers
-      Boost::filesystem)
-else()
-  find_package(JPEG REQUIRED)
-  find_package(PNG REQUIRED)
-  find_package(TIFF REQUIRED)
-  target_include_directories(GIL
-    INTERFACE
-      ${JPEG_INCLUDE_DIR})
-  target_link_libraries(GIL
-    INTERFACE
-      ${JPEG_LIBRARIES}
-      PNG::PNG
-      TIFF::TIFF
-      Boost::headers
-      Boost::filesystem)
-  if (TIFF_LIBRARY)
-    set(TIFFXX_NAMES tiffxx)
-    foreach(name ${TIFFXX_NAMES})
-      list(APPEND TIFFXX_NAMES_DEBUG "${name}d")
-    endforeach()
-    find_library(TIFFXX_LIBRARY_RELEASE NAMES ${TIFFXX_NAMES})
-    find_library(TIFFXX_LIBRARY_DEBUG NAMES ${TIFFXX_NAMES_DEBUG})
-    find_path(TIFFXX_INCLUDE_DIR NAMES tiffio.hxx)
-    include(SelectLibraryConfigurations)
-    select_library_configurations(TIFFXX)
-    mark_as_advanced(TIFFXX_LIBRARY_RELEASE TIFFXX_LIBRARY_DEBUG)
-    include(FindPackageHandleStandardArgs)
-    find_package_handle_standard_args(TIFFXX REQUIRED_VARS TIFFXX_LIBRARY TIFFXX_INCLUDE_DIR)
-    target_include_directories(GIL INTERFACE ${TIFFXX_INCLUDE_DIR})
-    target_link_libraries(GIL INTERFACE ${TIFFXX_LIBRARY})
-  endif()
 endif()
 
-### create the library target - blazing-gil
 find_package(blazing-gil REQUIRED)
 
 
 ### dependencies for examples
 add_executable(padding padding.cpp)
-target_link_libraries(padding blazing-gil::blazing-gil GIL blas_library)
+target_link_libraries(padding blazing-gil::blazing-gil)
 
 get_target_property(blazing_gil_include blazing-gil::blazing-gil INTERFACE_INCLUDE_DIRECTORIES)
 message(STATUS "Include directories of blazing-gil are set to ${blazing_gil_include}")
